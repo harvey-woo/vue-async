@@ -15,38 +15,41 @@ function createWatchers(){
 function destroyWatchers() {
   return Object.keys(this.$options.asyncComputed).forEach(key => {
       this.$asyncWatchers[key]();
-})
+  })
 }
+
+export const mixin = {
+  activated() {
+    if (this.$options.asyncComputed) {
+      createWatchers.call(this);
+    }
+  },
+  deactivated(){
+    if (this.$options.asyncComputed) {
+      destroyWatchers.call(this);
+    }
+  },
+  created() {
+    if (this.$options.asyncComputed) {
+      createWatchers.call(this);
+    }
+  },
+  data() {
+    if (this.$options.asyncComputed) {
+      return Object.keys(this.$options.asyncComputed).reduce((data, key) => {
+        data[key] = undefined;
+        return data;
+      }, {});
+    }
+    return {};
+  }
+};
 
 export default {
   install(Vue, options) {
     Vue.prototype.$asyncOptions = options;
     Vue.config.optionMergeStrategies.asyncComputed = Vue.config.optionMergeStrategies.computed;
-    Vue.mixin({
-      activated() {
-        if (this.$options.asyncComputed) {
-          createWatchers.call(this);
-        }
-      },
-      deactivated(){
-        if (this.$options.asyncComputed) {
-          destroyWatchers.call(this);
-        }
-      },
-      created() {
-        if (this.$options.asyncComputed) {
-          createWatchers.call(this);
-        }
-      },
-      data() {
-        if (this.$options.asyncComputed) {
-          return Object.keys(this.$options.asyncComputed).reduce((data, key) => {
-              data[key] = undefined;
-          return data;
-        }, {});
-        }
-        return {};
-      }
-    });
+    Vue.mixin(mixin);
   }
 }
+

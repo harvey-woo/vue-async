@@ -1,6 +1,6 @@
 {
   "name": "@lianj/vue-async",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "基于Promise，为vue提供异步流程的工具",
   "directories": {
     "test": "test"
