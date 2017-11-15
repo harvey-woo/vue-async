@@ -1,0 +1,11 @@
+node_modules
+docs
+dist
+
+# ide
+.idea
+.project
+
+# system
+.DS_Store
+desktop.ini

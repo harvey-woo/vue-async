@@ -1,0 +1,13 @@
+test
+node_modules
+.git
+
+# ide
+.idea
+.project
+
+# system
+.DS_Store
+desktop.ini
+
+.gitignore
