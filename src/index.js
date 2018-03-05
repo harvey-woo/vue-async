@@ -4,7 +4,15 @@ function createWatchers(){
     if (!item.watcher) {
       item.watcher = this.$watch(() => item.get.call(this, this.$asyncOptions.context.call(this)), async (p) => {
         this[key] = typeof item.default === 'function' ? item.default.call(this, this[key]) : item.default;
-        this[key] = await p;
+        try {
+          this[key] = await p;
+        } catch(e) {
+          if (item.error) {
+            item.error.call(this, e);
+          } else {
+            throw e;
+          }
+        }
       }, {
         immediate: true
       });
@@ -38,6 +46,7 @@ export const mixin = {
   data() {
     if (this.$options.asyncComputed) {
       const DEFAULT_ITEM = {
+        error: this.$asyncOptions.error,
         default: undefined,
         watcher: null
       }
