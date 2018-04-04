@@ -1,3 +1,36 @@
+function handleError(config, err, vm, info) {
+  if (vm) {
+    let cur = vm
+    while ((cur = cur.$parent)) {
+      const hooks = cur.$options.errorCaptured
+      if (hooks) {
+        for (let i = 0; i < hooks.length; i++) {
+          try {
+            const capture = hooks[i].call(cur, err, vm, info) === false
+            if (capture) return
+          } catch (e) {
+            globalHandleError(config, e, cur, 'errorCaptured hook')
+          }
+        }
+      }
+    }
+  }
+  globalHandleError(config, err, vm, info)
+}
+
+function globalHandleError(config, err, vm, info) {
+  if (config.errorHandler) {
+    try {
+      return config.errorHandler.call(null, err, vm, info)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+  console.error(err)
+}
+
+// 上面两个函数来自于Vue
+
 export const mixin = {
   activated() {
     if (this.$asyncWatcherItems) {
@@ -13,7 +46,7 @@ export const mixin = {
   deactivated(){
     if (this.$asyncWatcherItems) {
       this.$asyncWatcherItems.forEach(item => {
-        if (item.destroyWhenDeactivated) {
+        if (item.destoryWhenDeactivated) {
           item.watcher();
           item.watcher = null;
         }
@@ -61,11 +94,7 @@ export const mixin = {
               try {
                 this[key] = await p;
               } catch(e) {
-                if (item.error) {
-                  item.error.call(this, e);
-                } else {
-                  throw e;
-                }
+                item.error.call(this, e, item.vueConfig);
               }
             }
           },
@@ -88,7 +117,10 @@ export const mixin = {
 const DEFAULT_OPTIONS = {
   default: undefined,
   watcher: null,
-  destroyWhenDeactivated: true
+  destoryWhenDeactivated: true,
+  error(e, vueConfig) {
+    handleError(vueConfig, e, this, 'asyncComputed')
+  }
 }
 
 export default {
@@ -97,7 +129,8 @@ export default {
     if (options) {
       Vue.prototype.$asyncOptions = {
         ...DEFAULT_OPTIONS,
-        ...options
+        ...options,
+        vueConfig: Vue.config
       };
     }
     Vue.config.optionMergeStrategies.asyncComputed = Vue.config.optionMergeStrategies.computed;
