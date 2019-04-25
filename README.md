@@ -1,30 +1,23 @@
-> **该模块以es7编写，请使用babel编译后使用**
+![logo](./logo.png)
+
+# Vue Async
+本插件意在无痛解决vue处理异步数据的一揽子问题。包括异步的computed以及异步data，以及提供其相关服务端的方案
+
 
 # 支持
+
+> 本resistry仍在开发阶段，并不可用，感谢客官们的关注
+
 - [x] asyncComputed browser
-- [ ] asyncComputed server
+- [x] asyncComputed server
 - [ ] asyncData browser and server
 
 # 安装
 
-```vue
 
-<template>
-  <div></div>
-</template>
-<script>
-  import {mixin} from '@lianj/vue-async/src/index'
-  export default {
-    mixins: [mixin]
-  }
-</script>
-
-```
-
-或者全局安装
 ```
 import Vue from 'vue';
-import async from '@lianj/vue-async/src/index'
+import async from '@cat5th/vue-async/src/index'
 Vue.mixin(async)
 ```
 

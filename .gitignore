@@ -1,10 +1,14 @@
 node_modules
 docs
 dist
+.cache
+yarn-error.log
+demo/server/main.js
 
 # ide
 .idea
 .project
+.vscode
 
 # system
 .DS_Store

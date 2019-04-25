@@ -31,106 +31,172 @@ function globalHandleError(config, err, vm, info) {
 
 // 上面两个函数来自于Vue
 
-export const mixin = {
-  activated() {
-    if (this.$asyncWatcherItems) {
-      return this.$asyncWatcherItems.forEach(item => {
-        if (!item.watcher) {
-          item.watcher = this.$watch(item.watchOpts.fn, item.watchOpts.callback, {
-            immediate: true
-          });
-        }
-      });
+
+function initAsyncItemsOptions() {
+  if (this.$options.asyncComputed && !this.$asyncComputedItems) {
+    if (this.$options.asyncOptions) {
+      this.$asyncOptions = {
+        ...this.$asyncOptions,
+        ...this.$options.asyncOptions
+      }
     }
-  },
-  deactivated(){
-    if (this.$asyncWatcherItems) {
-      this.$asyncWatcherItems.forEach(item => {
-        if (item.destoryWhenDeactivated) {
-          item.watcher();
-          item.watcher = null;
-        }
-      })
-    }
-  },
-  created() {
-    if (this.$asyncWatcherItems) {
-      return this.$asyncWatcherItems.forEach(item => {
-        if (!item.watcher) {
-          item.watcher = this.$watch(item.watchOpts.fn, item.watchOpts.callback, {
-            immediate: true
-          });
-        }
-      });
-    }
-  },
-  methods: {
-    $asyncReady() {
-      return Promise.all(this.$asyncWatcherItems.map(item => item.currentFnResult));
-    }
-  },
-  data() {
-    if (this.$options.asyncComputed) {
-      if (this.$options.asyncOptions) {
-        this.$asyncOptions = {
-          ...this.$asyncOptions,
-          ...this.$options.asyncOptions
+    this.$asyncComputedItems = Object.keys(this.$options.asyncComputed).map((key) => {
+      let item = this.$options.asyncComputed[key];
+      if (typeof item !== 'object') {
+        item = {
+          get: item
         }
       }
-      this.$asyncWatcherItems = Object.keys(this.$options.asyncComputed).map((key) => {
-        let item = this.$options.asyncComputed[key];
-        if (typeof item !== 'object') {
-          item = {
-            get: item
-          }
-        }
-        item = {
-          key,
+      item = {
+        key,
+        ...(this.$isServer ? {} : {
           currentFnResult: undefined,
           watchOpts: {
-            fn: () => { return item.currentFnResult = item.get.call(this, item.context.call(this)) },
+            fn: () => { return item.currentFnResult = item.get.call(this) },
             callback: async (p) => {
               this[key] = typeof item.default === 'function' ? item.default.call(this, this[key]) : item.default;
               try {
                 this[key] = await p;
               } catch(e) {
-                item.error.call(this, e, item.vueConfig);
+                item.error.call(this, e, 'asyncComputed');
               }
             }
           },
-          ...this.$asyncOptions,
-          ...item
+        }),
+        ...this.$asyncOptions,
+        ...item
+      }
+      return item
+    });
+  }
+}
+
+function activateWatcher(initData = {}) {
+  if (this.$asyncComputedItems && !this.$isServer) {
+    return this.$asyncComputedItems.forEach(item => {
+      if (!item.watcher) {
+        const hasInitData = item.key in initData
+        item.watcher = this.$watch(item.watchOpts.fn, item.watchOpts.callback, {
+          immediate: !hasInitData
+        });
+        if (hasInitData) {
+          this[item.key] = initData[item.key]
         }
-        return item
-      });
+      }
+    });
+  }
+}
+
+function deactivateWatcher() {
+  if (this.$asyncComputedItems) {
+    this.$asyncComputedItems.forEach(item => {
+      if (item.destoryWhenDeactivated) {
+        item.watcher();
+        item.watcher = null;
+      }
+    })
+  }
+}
+
+
+function initAcyncData(vm, initData) {
+  activateWatcher.call(vm, initData)
+  if (vm.$children) {
+    vm.$children.forEach((child, i) => {
+      initAcyncData(child, initData.$children[i])
+    })
+  }
+}
+
+function fetchAsyncData() {
+  return this.$options.asyncData.call(this).then((data) => {
+    Object.keys(data).forEach(k => {
+      this[k] = data[k]
+    })
+  }, (e) => {
+    this.$asyncOptions.error.call(this, e, 'asyncData')
+  })
+}
+
+
+
+export const mixin = {
+
+  beforeCreate() {
+    initAsyncItemsOptions.call(this)
+    // if (this.$root === this && this.$isServer) {
+    //   const oldRender = this.$options.render
+    //   this.$options.render = (...args) => {
+    //     const vdom = oldRender.call(this, ...args)
+    //     this.$asyncOptions.context.asyncInitState = extractInitState(this)
+    //     return vdom
+    //   }
+    // }
+  },
+  deactivated(){
+    deactivateWatcher.call(this)
+  },
+  mounted() {
+    if (this.$root === this && !this.$isServer) {
+      initAcyncData(this, global.VUE_ASYNC_INIT_STATE)
     }
-    if (this.$asyncWatcherItems) {
-      return this.$asyncWatcherItems.reduce((data, item) => {
+  },
+  created() {
+
+    // if (this.$root === this) {
+    //   if (this.$isServer) {
+
+    //   } else {
+    //     initAcyncData(this, { a: 'b' })
+    //   }
+    // }
+
+  },
+  methods: {
+    $asyncReady() {
+      return Promise.all(this.$asyncComputedItems.map(item => item.currentFnResult));
+    }
+  },
+  async serverPrefetch() {
+    if (this.$asyncComputedItems) {
+      await Promise.all(this.$asyncComputedItems.map(async item => {
+        this[item.key] = await item.get()
+      }))
+    }
+    if (this.$options.asyncData && this.$options.asyncDataServerPrefetch) {
+      await fetchAsyncData.call(this)
+    }
+  },
+  data() {
+    let data = {}
+    if (this.$asyncComputedItems) {
+      data = this.$asyncComputedItems.reduce((data, item) => {
         data[item.key] = typeof item.default === 'function' ? item.default.call(this) : item.default;
         return data;
       }, {})
     }
-    return {};
+    if (this.$options.asyncData && !this.$options.asyncDataServerPrefetch) {
+      fetchAsyncData.call(this)
+    }
+    return data;
   }
 };
-
-const DEFAULT_OPTIONS = {
-  default: undefined,
-  watcher: null,
-  destoryWhenDeactivated: true,
-  error(e, vueConfig) {
-    handleError(vueConfig, e, this, 'asyncComputed')
-  }
-}
 
 export default {
   install(Vue, options) {
     options = options || {}
     if (options) {
+      const DEFAULT_OPTIONS = {
+        default: undefined,
+        watcher: null,
+        destoryWhenDeactivated: true,
+        error(e, info) {
+          handleError(Vue.config, e, this, info)
+        }
+      }
       Vue.prototype.$asyncOptions = {
         ...DEFAULT_OPTIONS,
-        ...options,
-        vueConfig: Vue.config
+        ...options
       };
     }
     Vue.config.optionMergeStrategies.asyncComputed = Vue.config.optionMergeStrategies.computed;

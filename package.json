@@ -1,14 +1,27 @@
 {
   "name": "@lianj/vue-async",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "基于Promise，为vue提供异步流程的工具",
   "directories": {
     "test": "test"
   },
   "scripts": {
-    "doc": "esdoc && start ./docs/index.html",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "clear": "rimraf dist && rimraf .cache",
+    "dev": "npm run clear && node demo/server"
   },
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "@babel/core": "^7.4.3",
+    "@babel/plugin-transform-runtime": "^7.4.3",
+    "@babel/preset-env": "^7.4.3",
+    "esm": "^3.2.22",
+    "express": "^4.16.4",
+    "parcel-bundler": "^1.12.3",
+    "rimraf": "^2.6.3",
+    "serialize-javascript": "https://github.com/harvey-woo/serialize-javascript#master",
+    "vue": "^2.6.10",
+    "vue-router": "^3.0.6",
+    "vue-server-renderer": "^2.6.10"
+  }
 }
